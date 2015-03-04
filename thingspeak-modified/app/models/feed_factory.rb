@@ -13,6 +13,7 @@ class FeedFactory < ApplicationController
     @limit = calculate_limit
     @use_daily_feed = DailyFeed.valid_params(options) # determine whether daily feed should be used
     @calculation_type = DailyFeed.calculation_type(options) # set the calculation type
+    #@feed_select_options = Feedsweather.select_options(@channel, @options)
     @feed_select_options = Feed.select_options(@channel, @options)
     @cache_feeds = cache_feeds?
   end
@@ -101,9 +102,13 @@ class FeedFactory < ApplicationController
     if @options[:start_entry_id].present? || @options[:end_entry_id].present?
       @feeds = Feed.from("feeds FORCE INDEX (index_feeds_on_channel_id_and_entry_id)")
         .where(:channel_id => @channel.id, :entry_id => entry_id_range)
+       #@feeds = Feedsweather.from("feedsweathers")
+       #.where(:channel_id => @channel.id, :entry_id => entry_id_range)
     # get feed based on conditions
     else
-      @feeds = Feed.from("feeds FORCE INDEX (index_feeds_on_channel_id_and_created_at)")
+      #@feeds = Feedsweather.from("feedsweathers")
+        #.where(:channel_id => @channel.id, :created_at => @date_range)
+         @feeds = Feed.from("feeds")
         .where(:channel_id => @channel.id, :created_at => @date_range)
     end
 

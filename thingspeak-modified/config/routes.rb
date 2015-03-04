@@ -8,6 +8,10 @@ Thingspeak::Application.routes.draw do
   match 'update', :to => 'channels#post_data', :via => ((GET_SUPPORT) ? [:get, :post] : :post)
   match 's/update', :to => 'channels#post_data', :via => [:get, :post]
 
+  #feedweather routing
+  match 'fw/update', :to  => 'channels#post_data_fw', :via => ((GET_SUPPORT) ? [:get, :post] : :post)
+
+
   # handle subdomain routes
   get '/', :to => 'subdomains#index', :constraints => { :subdomain => 'api' }
   get 'crossdomain', :to => 'subdomains#crossdomain', :constraints => { :subdomain => 'api' }
@@ -69,6 +73,13 @@ Thingspeak::Application.routes.draw do
   get 'channels/:channel_id/social_feed' => 'channels#social_feed'
   get 'channels/:channel_id/feed(s)/debug' => 'feed#debug'
   delete 'channels/:id/feeds' => 'channels#clear'
+
+  # feeds for feedweather
+  get 'channels/:channel_id/fw/feed(s)(.:format)' => 'feedsweather#index'
+  get 'channels/:channel_id/fw/field/:field_id(.:format)' => 'feedsweather#index' # not sure why this doesn't work with (s)
+  get 'channels/:channel_id/fw/fields/:field_id(.:format)' => 'feedsweather#index' # not sure why this doesn't work with (s)
+  get 'channels/:channel_id/fw/field/:field_id/:id(.:format)' => 'feedsweather#show' # not sure why this doesn't work with (s)
+  get 'channels/:channel_id/fw/fields/:field_id/:id(.:format)' => 'feedsweather#show' # not sure why this doesn't work with (s)
 
   # maps
   get 'channels/:channel_id/maps/channel_show' => 'maps#channel_show'

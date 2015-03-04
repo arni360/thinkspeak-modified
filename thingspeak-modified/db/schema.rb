@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20210227025236) do
+ActiveRecord::Schema.define(version: 20201117211041) do
 
   create_table "active_admin_comments", force: true do |t|
     t.string   "namespace"
@@ -206,24 +206,25 @@ ActiveRecord::Schema.define(version: 20210227025236) do
   add_index "feeds", ["channel_id", "created_at"], name: "index_feeds_on_channel_id_and_created_at", using: :btree
   add_index "feeds", ["channel_id", "entry_id"], name: "index_feeds_on_channel_id_and_entry_id", using: :btree
 
-  create_table "feedsweather", force: true do |t|
-    t.integer  "device_id"
-    t.text     "raw_data"
-    t.string   "temperature"
-    t.string   "field2"
-    t.string   "field3"
-    t.string   "field4"
-    t.string   "field5"
-    t.string   "field6"
-    t.string   "field7"
-    t.string   "field8"
+  create_table "feedsweathers", force: true do |t|
+    t.integer  "channel_id"
+    t.integer  "entry_id"
+    t.text     "temperature"
+    t.text     "pressure"
+    t.text     "humidity"
+    t.text     "pluviometry"
+    t.text     "luminosity"
+    t.text     "wms"
+    t.text     "wdir"
+    t.text     "was"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.integer  "entry_id"
-    t.string   "status"
+    t.text     "status"
+    t.decimal  "latitude",    precision: 15, scale: 10
+    t.decimal  "longitude",   precision: 15, scale: 10
+    t.text     "elevation"
+    t.text     "location"
   end
-
-  add_index "feedsweather", ["device_id"], name: "index_feedsweather_on_device_id", using: :btree
 
   create_table "headers", force: true do |t|
     t.string   "name"

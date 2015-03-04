@@ -1,10 +1,10 @@
 class ChannelsController < ApplicationController
   include ChannelsHelper, ApiKeys
   before_filter :authenticate_via_api_key!, :only => [:index]
-  before_filter :require_user, :except => [:realtime, :realtime_update, :show, :post_data, :social_show, :social_feed, :public]
+  before_filter :require_user, :except => [:realtime, :realtime_update, :show, :post_data,:post_data_fw, :social_show, :social_feed, :public]
   before_filter :set_channels_menu
   layout 'application', :except => [:social_show, :social_feed]
-  protect_from_forgery :except => [:realtime, :realtime_update, :post_data, :create, :destroy, :clear]
+  protect_from_forgery :except => [:realtime, :realtime_update, :post_data, :post_data_fw,:create, :destroy, :clear]
   require 'csv'
   require 'will_paginate/array'
 
@@ -303,7 +303,6 @@ class ChannelsController < ApplicationController
 
     status = '0'
     feed = Feed.new
-    
     api_key = ApiKey.find_by_api_key(get_apikey)
 
     # if write permission, allow post
@@ -326,6 +325,7 @@ class ChannelsController < ApplicationController
       entry_id = channel.next_entry_id
       channel.last_entry_id = entry_id
       feed.entry_id = entry_id
+     
       # set user agent
       channel.user_agent = get_header_value('USER_AGENT')
 
@@ -333,6 +333,7 @@ class ChannelsController < ApplicationController
       if params[:created_at].present?
         begin
           feed.created_at = ActiveSupport::TimeZone[Time.zone.name].parse(params[:created_at])
+         
           # if invalid datetime, don't do anything--rails will set created_at
         rescue
         end
@@ -368,6 +369,8 @@ class ChannelsController < ApplicationController
       feed.elevation = params[:elevation] if params[:elevation]
       feed.location = params[:location] if params[:location]
 
+
+     
       # if the saves were successful
       if channel.save && feed.save
         status = entry_id
@@ -414,6 +417,121 @@ class ChannelsController < ApplicationController
       format.any { render :text => status }
     end and return
   end
+
+def post_data_fw
+
+    status = '0'
+    feedweather = Feedsweather.new
+    api_key = ApiKey.find_by_api_key(get_apikey)
+    # if write permission, allow post
+    if (api_key && api_key.write_flag)
+      channel = api_key.channel
+
+      # don't rate limit if tstream parameter is present
+      tstream = params[:tstream] || false;
+
+      # don't rate limit if talkback_key parameter is present
+      talkback_key = params[:talkback_key] || false;
+
+      # rate limit posts if channel is not social and timespan is smaller than the allowed window
+      render :text => '0' and return if (RATE_LIMIT && !tstream && !talkback_key && !channel.social && Time.now < channel.updated_at + RATE_LIMIT_FREQUENCY.to_i.seconds)
+
+      # if social channel, latitude MUST be present
+      render :text => '0' and return if (channel.social && params[:latitude].blank?)
+
+      # update entry_id for channel and feed
+      entry_id = channel.next_entry_id
+      channel.last_entry_id = entry_id
+      feedweather.entry_id = entry_id
+      # set user agent
+      channel.user_agent = get_header_value('USER_AGENT')
+
+      # try to get created_at datetime if appropriate
+      if params[:created_at].present?
+        begin
+          feedweather.created_at = ActiveSupport::TimeZone[Time.zone.name].parse(params[:created_at])
+          # if invalid datetime, don't do anything--rails will set created_at
+        rescue
+        end
+      end
+
+      # modify parameters
+      params.each do |key, value|
+        # this fails so much due to encoding problems that we need to ignore errors
+        begin
+          # strip line feeds from end of parameters
+          params[key] = value.sub(/\\n$/, '').sub(/\\r$/, '') if value
+          # use ip address if found
+          params[key] = get_header_value('X_REAL_IP') if value.try(:upcase) == 'IP_ADDRESS'
+        rescue
+        end
+      end
+
+
+      # set feed details
+      feedweather.channel_id = channel.id
+      feedweather.temperature = params[:temperature] || params['1'] if params[:temperature] || params['1']
+      feedweather.pressure= params[:pressure] || params['2'] if params[:pressure] || params['2']
+      feedweather.humidity = params[:humidity] || params['3'] if params[:humidity] || params['3']
+      feedweather.pluviometry = params[:pluviometry] || params['4'] if params[:pluviometry] || params['4']
+      feedweather.luminosity = params[:luminosity] || params['5'] if params[:luminosity] || params['5']
+      feedweather.wms = params[:wms] || params['6'] if params[:wms] || params['6']
+      feedweather.wdir = params[:wdir] || params['7'] if params[:wdir] || params['7']
+      feedweather.was = params[:was] || params['8'] if params[:was] || params['8']
+      feedweather.status = params[:status] if params[:status]
+      feedweather.latitude = params[:lat] if params[:lat]
+      feedweather.latitude = params[:latitude] if params[:latitude]
+      feedweather.longitude = params[:long] if params[:long]
+      feedweather.longitude = params[:longitude] if params[:longitude]
+      feedweather.elevation = params[:elevation] if params[:elevation]
+      feedweather.location = params[:location] if params[:location]
+      # if the saves were successful
+      if channel.save && feedweather.save
+        status = entry_id
+
+        # check for tweet
+        if params[:twitter] && params[:tweet]
+          # check username
+          twitter_account = TwitterAccount.find_by_user_id_and_screen_name(api_key.user_id, params[:twitter])
+          if twitter_account
+            twitter_account.tweet(params[:tweet])
+          end
+        end
+      else
+        raise "Channel or Feed didn't save correctly"
+      end
+    end
+
+    # if there is a talkback to execute
+    if params[:talkback_key].present?
+      talkback = Talkback.find_by_api_key(params[:talkback_key])
+      command = talkback.execute_command! if talkback.present?
+    end
+
+    # output response code
+    render(:text => '0', :status => 400) and return if status == '0'
+
+    # if there is a talkback_key and a command that was executed
+    if params[:talkback_key].present? && command.present?
+        respond_to do |format|
+          format.html { render :text => command.command_string }
+          format.json { render :json => command.to_json }
+          format.xml { render :xml => command.to_xml(Command.public_options) }
+        end and return
+    end
+
+    # if there is a talkback_key but no command
+    respond_with_blank and return if params[:talkback_key].present? && command.blank?
+
+    # normal route, respond with the feed
+    respond_to do |format|
+      format.html { render :text => status }
+      format.json { render :json => feedweather.to_json }
+      format.xml { render :xml => feedweather.to_xml(Feed.public_options) }
+      format.any { render :text => status }
+    end and return
+  end
+
 
   # import view
   def import

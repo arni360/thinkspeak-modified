@@ -8,7 +8,7 @@ class FeedController < ApplicationController
     channel = feed_factory.channel
     api_key = ApiKey.find_by_api_key(get_apikey)
     @success = channel_permission?(channel, api_key)
-
+    logger.debug "Person attributes hash: #{params}"
     # set callback for jsonp
     @callback = params[:callback] if params[:callback]
 
@@ -19,6 +19,7 @@ class FeedController < ApplicationController
     if @success
 
       if feed_factory.cache_feeds
+        logger.info "cache"
         # check cache for stored value
         feed_output_cache_key = cache_key('feed_output')
         channel_output_cache_key = cache_key('channel_output')
@@ -28,10 +29,10 @@ class FeedController < ApplicationController
 
       # if cache miss, get data
       if @feed_output.nil? or @channel_output.nil?
-
+         logger.info "pas de cache"
         # get feeds
         feeds = feed_factory.get_output_feeds
-
+        logger.info "hey ici: #{feeds}"
         # set output correctly
         if params[:format] == 'xml'
           @channel_output = channel.to_xml(channel.select_options(params)).sub('</channel>', '').strip
@@ -39,6 +40,7 @@ class FeedController < ApplicationController
         elsif params[:format] == 'csv'
           @feed_output = feeds
         else
+          
           @channel_output = channel.to_json(channel.select_options(params)).chop
           @feed_output = feeds.to_json(:only => feed_factory.feed_select_options)
         end

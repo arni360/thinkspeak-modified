@@ -6,6 +6,8 @@
     <div class="col-pad">
 
       <%= link_to t(:new_model, model: 'Plugin'), new_plugin_path, class: 'btn btn-primary' %>
+    </br></br>
+      <%= link_to t(:WeatherPlugin), '/plugins/new', class: 'btn btn-primary' %>
       <br><br>
 
       <% if @plugins.length > 0 %>
@@ -54,4 +56,6 @@
   </div>
 
 </div>
+
+
 
